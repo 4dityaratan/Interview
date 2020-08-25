@@ -23,24 +23,696 @@
                  p.product_id,
                  o.order_id;
 ## The Most Similar Path in a Graph
+// Time:  O(n^2 * m), m is the length of targetPath
+// Space: O(n * m)
+
+class Solution {
+public:
+    vector<int> mostSimilar(int n, vector<vector<int>>& roads, vector<string>& names, vector<string>& targetPath) {
+        vector<vector<int>> adj(n);
+        for (const auto& road : roads) {
+            adj[road[0]].emplace_back(road[1]);
+            adj[road[1]].emplace_back(road[0]);
+        }
+
+        vector<vector<int>> dp(targetPath.size() + 1, vector<int>(n));
+        for (int i = 1; i <= targetPath.size(); ++i) {
+            for (int v = 0; v < n; ++v) {
+                dp[i][v] = targetPath.size();
+                for (const auto& u : adj[v]) {
+                    dp[i][v] = min(dp[i][v], dp[i - 1][u]);
+                }
+                dp[i][v] += int(names[v] != targetPath[i - 1]);
+            }
+        }
+
+        vector<int> path = {static_cast<int>(distance(cbegin(dp.back()), 
+                                                      min_element(cbegin(dp.back()), cend(dp.back()))))};
+        for (int i = targetPath.size(); i >= 2; --i) {
+            for (const auto& u : adj[path.back()]) {
+                if (dp[i - 1][u] + int(names[path.back()] != targetPath[i - 1]) == dp[i][path.back()]) {
+                    path.emplace_back(u);
+                    break;
+                }
+            }
+        }
+        reverse(begin(path), end(path));
+        return path;
+    }
+};
+
 ## Fix Product Name Format
+Time:  O(nlogn)
+Space: O(n)
+
+SELECT LOWER(TRIM(product_name)) product_name,
+       substring(sale_date, 1, 7) sale_date,
+       count(sale_id) total
+FROM sales
+GROUP BY 1, 2
+ORDER BY 1, 2;
+
 ## Guess the Majority in a Hidden Array
+// Time:  O(n), n queries
+// Space: O(1)
+
+class Solution {
+public:
+    int guessMajority(ArrayReader &reader) {
+        int count_a = 1, count_b = 0, idx_b = -1;
+        const auto& value_0_1_2_3 = reader.query(0, 1, 2, 3);
+        int value_0_1_2_i = -1;
+        for (int i = reader.length() - 1; i >= 4; --i) {
+            value_0_1_2_i = reader.query(0, 1, 2, i);
+            if (value_0_1_2_i == value_0_1_2_3) {  // nums[i] == nums[3]
+                ++count_a;
+            } else {
+                ++count_b;
+                idx_b = i;
+            }
+        }
+        const auto& value_0_1_2_4 = value_0_1_2_i;
+        for (int i = 0; i < 3; ++i) {
+            vector<int> a_b;
+            for (int j = 0; j < 3; ++j) {
+                if (j == i) {
+                    continue;
+                }
+                a_b.emplace_back(j);
+            }
+            const auto& value_a_b_3_4 = reader.query(a_b[0], a_b[1], 3, 4);
+            if (value_a_b_3_4 == value_0_1_2_4) {  // nums[i] == nums[3]
+                ++count_a;
+            } else {
+                ++count_b;
+                idx_b = i;
+            }
+        }
+        if (count_a == count_b) {
+            return -1;
+        }
+        return count_a > count_b ? 3 : idx_b;
+    }
+};
+         
 ## Find the Index of the Large Integer
+// Time:  O(logn)
+// Space: O(1)
+
+class Solution {
+public:
+    int getIndex(ArrayReader &reader) {
+        int left = 0, right = reader.length() - 1;
+        while (left < right) {
+            const auto& mid = left + (right - left) / 2;
+            if (reader.compareSub(left, mid, (right - left + 1) % 2 ? mid : mid + 1, right) >= 0) {
+                right = mid;
+            }  else {
+                left = mid + 1;
+            }
+        }
+        return left;
+    }
+};
+
 ## The Most Recent Three Orders
+Time:  O(nlogn)
+Space: O(n)
+
+SELECT customer_name,
+       customer_id,
+       order_id,
+       order_date
+FROM
+  (SELECT @accu := (CASE
+                        WHEN co.customer_id = @prev THEN @accu + 1
+                        ELSE 1
+                    END) AS n,
+          @prev := co.customer_id AS customer_id,
+          co.name AS customer_name,
+          co.order_id AS order_id,
+          co.order_date AS order_date
+   FROM
+     (SELECT @accu := 0, @prev := 0) AS init,
+     (SELECT c.name, c.customer_id, o.order_id, o.order_date FROM
+      Customers c
+      INNER JOIN Orders o
+      ON c.customer_id = o.customer_id
+      ORDER BY c.name ASC, c.customer_id ASC, o.order_date DESC) AS co
+  ) AS tmp
+WHERE n < 4;
+
 ## Patients With a Condition
+Time:  O(n)
+Space: O(n)
+
+SELECT * 
+FROM Patients AS p
+WHERE p.conditions REGEXP '^DIAB1| DIAB1';
+
+
 ## Diameter of N-Ary Tree
-## Find Users With Valid E-Mails
+// Time:  O(n)
+// Space: O(h)
+
+class Solution {
+public:
+    int diameter(Node* root) {
+        return iter_dfs(root).first;
+    }
+
+private:
+    pair<int, int> iter_dfs(Node *root) {
+        using RET = pair<int, int>;
+        RET result;
+        vector<tuple<int, Node *, shared_ptr<RET>, RET *>> stk = {{1, root, nullptr, &result}};
+        while (!stk.empty()) {
+            const auto [step, node, ret2, ret] = stk.back(); stk.pop_back();
+            if (step == 1) {
+                for (int i = node->children.size() - 1; i >= 0; --i) {
+                    const auto& ret2 = make_shared<RET>();
+                    stk.emplace_back(2, nullptr, ret2, ret);
+                    stk.emplace_back(1, node->children[i], nullptr, ret2.get());
+                }
+            } else {
+                ret->first = max(ret->first, max(ret2->first, ret->second + ret2->second + 1));
+                ret->second = max(ret->second, ret2->second + 1);
+            }
+        }
+        return result;
+    }
+};
+
+// Time:  O(n)
+// Space: O(h)
+class Solution2 {
+public:
+    int diameter(Node* root) {
+        return dfs(root).first;
+    }
+
+private:
+    pair<int, int> dfs(Node *node) {
+        int max_dia = 0, max_depth = 0;
+        for (const auto& child : node->children) {
+            const auto& [child_max_dia, child_max_depth] = dfs(child);
+            max_dia = max({max_dia, child_max_dia, max_depth + child_max_depth + 1});
+            max_depth = max(max_depth, child_max_depth + 1);
+        }
+        return {max_dia, max_depth};
+    }
+};
+
+
+## Find Users With Valid E-Mails  
+Time:  O(n)
+Space: O(n)
+
+SELECT * 
+FROM   users AS u 
+WHERE  u.mail REGEXP '^[a-zA-Z][a-zA-Z0-9._-]*@leetcode.com$'; 
+
 ## Move Sub-Tree of N-Ary Tree
+// Time:  O(n)
+// Space: O(h)
+
+/*
+// Definition for a Node.
+class Node {
+public:
+    int val;
+    vector<Node*> children;
+    Node() {}
+    Node(int _val) {
+        val = _val;
+    }
+    Node(int _val, vector<Node*> _children) {
+        val = _val;
+        children = _children;
+    }
+};
+*/
+
+// one pass solution without recursion
+class Solution {
+public:
+    Node* moveSubTree(Node* root, Node* p, Node* q) {
+        unordered_map<Node *, Node *> lookup;
+        const auto& is_ancestor = iter_find_parents(root, nullptr, p, q, false, &lookup);
+        if (lookup.count(p) && lookup[p] == q) {
+            return root;
+        }
+        q->children.emplace_back(p);
+        if (!is_ancestor) {
+            lookup[p]->children.erase(find(begin(lookup[p]->children), end(lookup[p]->children), p));
+        } else {
+            lookup[q]->children.erase(find(begin(lookup[q]->children), end(lookup[q]->children), q));
+            if (p == root) {
+                root = q;
+            } else {
+                *find(begin(lookup[p]->children), end(lookup[p]->children), p) = q;
+            }
+        }
+        return root;
+    }
+
+private:
+    bool iter_find_parents(Node *node, Node *parent, Node *p, Node *q,
+                           bool is_ancestor,
+                           unordered_map<Node *, Node *> *lookup) {
+        vector<tuple<int, Node *, Node *, bool, int>> stk = {tuple(1, node, parent, is_ancestor, -1)};
+        while (!stk.empty()) {
+            const auto [step, node, parent, is_ancestor, i] = stk.back(); stk.pop_back();
+            if (step == 1) {
+                if (node == p || node == q) {
+                    (*lookup)[node] = parent;
+                    if (lookup->size() == 2) {
+                        return is_ancestor;
+                    }
+                }
+                stk.emplace_back(2, node, parent, is_ancestor, node->children.size() - 1);
+            } else {
+                if (i < 0) {
+                    continue;
+                }
+                stk.emplace_back(2, node, parent, is_ancestor, i - 1);
+                stk.emplace_back(1, node->children[i], node, is_ancestor || node == p, -1);
+            }
+        }
+        assert(false);
+        return false;
+    }
+};
+
+// Time:  O(n)
+// Space: O(h)
+// one pass solution with recursion
+class Solution_Recu {
+public:
+    Node* moveSubTree(Node* root, Node* p, Node* q) {
+        unordered_map<Node *, Node *> lookup;
+        const auto& [_, is_ancestor] = find_parents(root, nullptr, p, q, false, &lookup);
+        if (lookup.count(p) && lookup[p] == q) {
+            return root;
+        }
+        q->children.emplace_back(p);
+        if (!is_ancestor) {
+            lookup[p]->children.erase(find(begin(lookup[p]->children), end(lookup[p]->children), p));
+        } else {
+            lookup[q]->children.erase(find(begin(lookup[q]->children), end(lookup[q]->children), q));
+            if (p == root) {
+                root = q;
+            } else {
+                *find(begin(lookup[p]->children), end(lookup[p]->children), p) = q;
+            }
+        }
+        return root;
+    }
+
+private:
+    pair<bool, bool> find_parents(Node *node, Node *parent, Node *p, Node *q,
+                                  bool is_ancestor,
+                                  unordered_map<Node *, Node *> *lookup) {
+        if (node == p || node == q) {
+            (*lookup)[node] = parent;
+            if (lookup->size() == 2) {
+                return {true, is_ancestor};
+            }
+        }
+        for (const auto& child : node->children) {
+            const auto& [found, result] = find_parents(child, node, p, q, is_ancestor || node == p, lookup);
+            if (found) {
+                return {true, result};
+            }
+        }
+        return {false, false};
+    }
+};
+
+// Time:  O(n)
+// Space: O(h)
+// two pass solution without recursion
+class Solution2 {
+public:
+    Node* moveSubTree(Node* root, Node* p, Node* q) {
+        unordered_map<Node *, Node *> lookup;
+        iter_find_parents(root, nullptr, p, q, &lookup);
+        if (lookup.count(p) && lookup[p] == q) {
+            return root;
+        }
+        q->children.emplace_back(p);
+        if (!iter_is_ancestor(p, q)) {
+            lookup[p]->children.erase(find(begin(lookup[p]->children), end(lookup[p]->children), p));
+        } else {
+            lookup[q]->children.erase(find(begin(lookup[q]->children), end(lookup[q]->children), q));
+            if (p == root) {
+                root = q;
+            } else {
+                *find(begin(lookup[p]->children), end(lookup[p]->children), p) = q;
+            }
+        }
+        return root;
+    }
+
+private:
+    void iter_find_parents(Node *node, Node *parent, Node *p, Node *q,
+                           unordered_map<Node *, Node *> *lookup) {
+        vector<tuple<int, Node *, Node *, int>> stk = {tuple(1, node, parent, -1)};
+        while (!stk.empty()) {
+            const auto [step, node, parent, i] = stk.back(); stk.pop_back();
+            if (step == 1) {
+                if (node == p || node == q) {
+                    (*lookup)[node] = parent;
+                    if (lookup->size() == 2) {
+                        return;
+                    }
+                }
+                stk.emplace_back(2, node, parent, node->children.size() - 1);
+            } else {
+                if (i < 0) {
+                    continue;
+                }
+                stk.emplace_back(2, node, parent, i - 1);
+                stk.emplace_back(1, node->children[i], node, -1);
+            }
+        }
+    }
+    
+    bool iter_is_ancestor(Node *node, Node *q) {
+        vector<tuple<int, Node *, int>> stk = {tuple(1, node, -1)};
+        while (!stk.empty()) {
+            const auto [step, node, i] = stk.back(); stk.pop_back();
+            if (step == 1) {
+                stk.emplace_back(2, node, node->children.size() - 1);
+            } else {
+                if (i < 0) {
+                    continue;
+                }
+                if (node->children[i] == q) {
+                    return true;
+                }
+                stk.emplace_back(2, node, i - 1);
+                stk.emplace_back(1, node->children[i], -1);
+            }
+        }
+        return false;
+    }
+};
+
+// Time:  O(n)
+// Space: O(h)
+// two pass solution with recursion
+class Solution2_Recu {
+public:
+    Node* moveSubTree(Node* root, Node* p, Node* q) {
+        unordered_map<Node *, Node *> lookup;
+        find_parents(root, nullptr, p, q, &lookup);
+        if (lookup.count(p) && lookup[p] == q) {
+            return root;
+        }
+        q->children.emplace_back(p);
+        if (!is_ancestor(p, q)) {
+            lookup[p]->children.erase(find(begin(lookup[p]->children), end(lookup[p]->children), p));
+        } else {
+            lookup[q]->children.erase(find(begin(lookup[q]->children), end(lookup[q]->children), q));
+            if (p == root) {
+                root = q;
+            } else {
+                *find(begin(lookup[p]->children), end(lookup[p]->children), p) = q;
+            }
+        }
+        return root;
+    }
+
+private:
+    bool find_parents(Node *node, Node *parent, Node *p, Node *q, unordered_map<Node *, Node *> *lookup) {
+        if (node == p || node == q) {
+            (*lookup)[node] = parent;
+            if (lookup->size() == 2) {
+                return true;
+            }
+        }
+        for (const auto& child : node->children) {
+            if (find_parents(child, node, p, q, lookup)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool is_ancestor(Node *node, Node *q) {
+        for (const auto& child : node->children) {
+            if (child == q || is_ancestor(child, q)) {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+
 ## Customer Order Frequency
+Time:  O(n)
+Space: O(n)
+
+SELECT a.customer_id,
+       a.name
+FROM Customers AS a
+INNER JOIN
+  (SELECT *
+   FROM Orders
+   WHERE order_date BETWEEN "2020-06-01" AND "2020-07-31" ) AS b
+ON a.customer_id = b.customer_id
+INNER JOIN Product AS c
+ON b.product_id = c.product_id
+GROUP BY a.customer_id
+HAVING SUM(CASE
+               WHEN LEFT(b.order_date, 7) = "2020-06" THEN c.price * b.quantity
+               ELSE 0
+           END) >= 100
+AND    SUM(CASE
+               WHEN LEFT(b.order_date, 7) = "2020-07" THEN c.price * b.quantity
+               ELSE 0
+           END) >= 100
+ORDER BY NULL;
+
+
 ## Find Root of N-Ary Tree
+// Time:  O(n)
+// Space: O(1)
+
+class Solution {
+public:
+    Node* findRoot(vector<Node*> tree) {
+        uint64_t root = 0;
+        for (const auto& node : tree) {
+            root ^= reinterpret_cast<uint64_t>(node);
+            for (const auto& child : node->children) {
+                root ^= reinterpret_cast<uint64_t>(child);
+            }
+        }
+        return reinterpret_cast<Node *>(root);
+    }
+};
+
+
 ## Countries You Can Safely Invest In
+Time:  O(n)
+Space: O(n)
+
+SELECT co.name AS country
+FROM person p
+INNER JOIN country co ON SUBSTRING(phone_number, 1, 3) = country_code
+INNER JOIN calls c ON (p.id = c.caller_id OR p.id = c.callee_id)
+GROUP BY co.name
+HAVING AVG(duration) > (SELECT AVG(duration) as avg_duration FROM calls)
+ORDER BY NULL;
+
 ## Design a File Sharing System
+// Time:  ctor:    O(1)
+//        join:    O(logu + c), u is the number of total joined users
+//        leave:   O(logu + c), c is the number of chunks
+//        request: O(u)
+// Space: O(u * c)
+
+// "u ~= n" solution, n is the average number of users who own the chunk
+class FileSharing {
+public:
+    FileSharing(int m) {
+        
+    }
+    
+    int join(vector<int> ownedChunks) {
+        int userID = users_.size() + 1;
+        if (!min_heap_.empty()) {
+            userID = min_heap_.top();
+            min_heap_.pop();
+        } else {
+            users_.emplace_back();
+        }
+        for (const auto& chunk : ownedChunks) {
+            users_[userID - 1].emplace(chunk);
+        }
+        lookup_.emplace(userID);
+        return userID;
+    }
+    
+    void leave(int userID) {
+        if (!lookup_.count(userID)) {
+            return;
+        }
+        lookup_.erase(userID);
+        users_[userID - 1].clear();
+        min_heap_.emplace(userID);
+    }
+    
+    vector<int> request(int userID, int chunkID) {
+        vector<int> result;
+        for (int i = 0; i < users_.size(); ++i) {
+            if (users_[i].count(chunkID)) {
+                result.emplace_back(i + 1);
+            }
+        }
+        if (!result.empty()) {
+            users_[userID - 1].emplace(chunkID);
+        }
+        return result;
+    }
+
+private:
+    vector<unordered_set<int>> users_;
+    unordered_set<int> lookup_;
+    priority_queue<int, vector<int>, greater<int>> min_heap_;
+};
+
+// Time:  ctor:    O(1)
+//        join:    O(logu + c), u is the number of total joined users
+//        leave:   O(logu + c), c is the number of chunks
+//        request: O(nlogn)   , n is the average number of users who own the chunk
+// Space: O(u * c + m)
+// "u >> n" solution
+class FileSharing2 {
+public:
+    FileSharing2(int m) {
+        
+    }
+    
+    int join(vector<int> ownedChunks) {
+        int userID = users_.size() + 1;
+        if (!min_heap_.empty()) {
+            userID = min_heap_.top();
+            min_heap_.pop();
+        } else {
+            users_.emplace_back();
+        }
+        for (const auto& chunk : ownedChunks) {
+            users_[userID - 1].emplace(chunk);
+            chunks_[chunk].emplace(userID);
+        }
+        lookup_.emplace(userID);
+        return userID;
+    }
+    
+    void leave(int userID) {
+        if (!lookup_.count(userID)) {
+            return;
+        }
+        lookup_.erase(userID);
+        for (const auto& chunk : users_[userID - 1]) {
+            chunks_[chunk].erase(userID);
+        }
+        users_[userID - 1].clear();
+        min_heap_.emplace(userID);
+    }
+    
+    vector<int> request(int userID, int chunkID) {
+        vector<int> result(cbegin(chunks_[chunkID]), cend(chunks_[chunkID]));
+        sort(begin(result), end(result));
+        if (!result.empty()) {
+            users_[userID - 1].emplace(chunkID);
+            chunks_[chunkID].emplace(userID);
+        }
+        return result;
+    }
+
+private:
+    vector<unordered_set<int>> users_;
+    unordered_set<int> lookup_;
+    unordered_map<int, unordered_set<int>> chunks_;
+    priority_queue<int, vector<int>, greater<int>> min_heap_;
+};
+
 ## Friendly Movies Streamed Last Month
+Time:  O(n)
+Space: O(n)
+
+SELECT DISTINCT title
+FROM content ctt
+INNER JOIN TVProgram tv
+ON ctt.content_id = tv.content_id
+WHERE content_type = 'Movies'
+AND Kids_content = 'Y'
+AND program_date BETWEEN '2020-06-01' AND '2020-06-30';
+
 ## Clone N-ary Tree
+// Time:  O(n)
+// Space: O(h)
+
+class Solution {
+public:
+    Node* cloneTree(Node* root) {
+        using RET = Node*;
+        RET result{};
+        vector<tuple<int, RET, shared_ptr<RET>, RET *>> stk = {{1, root, nullptr, &result}};
+        while (!stk.empty()) {
+            const auto [step, node, ret1, ret] = stk.back(); stk.pop_back();
+            if (step == 1) {
+                if (!node) {
+                    continue;
+                }
+                *ret = new Node(node->val);
+                for (int i = node->children.size() - 1; i >= 0; --i) {
+                    const auto& ret1 = make_shared<RET>();
+                    stk.emplace_back(2, nullptr, ret1, ret);
+                    stk.emplace_back(1, node->children[i], nullptr, ret1.get());
+                }
+            } else {
+                (*ret)->children.emplace_back(*ret1);
+            }
+        }
+        return result;
+    }
+};
+
+// Time:  O(n)
+// Space: O(h)
+class Solution2 {
+public:
+    Node* cloneTree(Node* root) {
+        return dfs(root);
+    }
+
+private:
+    Node *dfs(Node *node) {
+        if (!node) {
+            return nullptr;
+        }
+        auto copy = new Node(node->val);
+        for (const auto& child : node->children) {
+            copy->children.emplace_back(dfs(child));
+        }
+        return copy;
+    }
+};
+
 ## Clone Binary Tree With Random Pointer
+
 ## Group Sold Products By The Date
+
 ## Sales by Day of the Week
+
 ## Delete N Nodes After M Nodes of a Linked List
+
 ## Find All The Lonely Nodes
 ## Calculate Salaries
 ## Rectangles Area
