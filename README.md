@@ -2434,52 +2434,1134 @@ GROUP BY tt.month,
            immediate_percentage 
     FROM   delivery;
 ## Diet Plan Performance
+	// Time:  O(n)
+	// Space: O(1)
+
+	class Solution {
+	public:
+	    int dietPlanPerformance(vector<int>& calories, int k, int lower, int upper) {
+		int total = accumulate(calories.cbegin(), calories.cbegin() + k, 0);
+		int result = int(total > upper) - int(total < lower);
+		for (int i = k; i < calories.size(); ++i) {
+		    total += calories[i] - calories[i - k];
+		    result += int(total > upper) - int(total < lower);
+		}
+		return result;
+	    }
+	};
+							      
 ## Product Price at a Given Date
+	# Time:  O(mlogn), m is the number of unique product id, n is the number of changed dates
+	# Space: O(m)
+
+	SELECT t1.product_id                      AS product_id, 
+	       IF(Isnull(t2.price), 10, t2.price) AS price 
+	FROM   (SELECT DISTINCT product_id 
+		FROM   products) AS t1 
+	       left join (SELECT product_id, 
+				 new_price AS price 
+			  FROM   products 
+			  WHERE  ( product_id, change_date ) IN (SELECT product_id, 
+									Max(change_date) 
+								 FROM   products 
+								 WHERE change_date <= '2019-08-16' 
+								 GROUP  BY product_id)) 
+			 AS t2 
+		      ON t1.product_id = t2.product_id 
+
 ## Market Analysis II
+	# Time:  O(m + n), m is the number of users, n is the number of orders
+	# Space: O(m + n)
+
+	SELECT user_id AS seller_id, 
+	       IF(item_brand = favorite_brand, 'yes', 'no') AS 2nd_item_fav_brand 
+	FROM   (SELECT user_id, 
+		       favorite_brand, 
+		       (SELECT    item_id
+			FROM      orders o 
+			WHERE     user_id = o.seller_id 
+			ORDER BY order_date limit 1, 1) item_id
+		FROM   users) u
+		LEFT JOIN items i 
+		ON        u.item_id = i.item_id
 ## Market Analysis I
+	# Time:  O(m + n)
+	# Space: O(m + n)
+
+	SELECT u.user_id                   AS buyer_id, 
+	       u.join_date, 
+	       Ifnull(t.orders_in_2019, 0) AS orders_in_2019 
+	FROM   users u 
+	       LEFT JOIN (SELECT buyer_id        AS user_id, 
+				 Count(buyer_id) AS orders_in_2019 
+			  FROM   orders 
+			  WHERE  Year(order_date) = 2019 
+			  GROUP  BY buyer_id)t 
+              ON u.user_id = t.user_id
 ## Article Views II
+	# Time:  O(nlogn)
+	# Space: O(n)
+
+	SELECT DISTINCT viewer_id AS id 
+	FROM   views 
+	GROUP  BY viewer_id, 
+		  view_date 
+	HAVING Count(DISTINCT article_id) > 1 
+	ORDER  BY id
 ## Article Views I
+
+	# Time:  O(nlogn)
+	# Space: O(n)
+
+	SELECT DISTINCT author_id AS id 
+	FROM   views 
+	WHERE  author_id = viewer_id 
+	ORDER  BY id
 ## User Activity for the Past 30 Days II
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT Round(Ifnull(Count(DISTINCT session_id) / Count(DISTINCT user_id), 0), 2) 
+	       AS 
+	       average_sessions_per_user 
+	FROM   activity 
+	WHERE  Datediff("2019-07-27", activity_date) < 30 
 ## User Activity for the Past 30 Days I
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT activity_date           AS day, 
+	       Count(DISTINCT user_id) AS active_users 
+	FROM   activity 
+	GROUP  BY activity_date 
+	HAVING Datediff("2019-07-27", activity_date) < 30 
+	ORDER  BY NULL
+	
 ## Reported Posts II
+	# Time:  O(m + n)
+	# Space: O(n)
+
+	SELECT ROUND(AVG(removal_percent), 2) average_daily_percent
+	FROM
+	  (SELECT a.action_date,
+		  COUNT(DISTINCT r.post_id) / COUNT(DISTINCT a.post_id) * 100 removal_percent
+	   FROM Actions a
+	   LEFT JOIN Removals r ON a.post_id = r.post_id
+	   WHERE a.extra = 'spam'
+	   GROUP BY a.action_date
+	   ORDER BY NULL) tmp
 ## Number of Ships in a Rectangle
+	// Time:  O(s * log(m * n)), s is the max number of ships, which is 10 in this problem
+	// Space: O(log(m * n))
+
+	/**
+	 * // This is Sea's API interface.
+	 * // You should not implement it, or speculate about its implementation
+	 * class Sea {
+	 *   public:
+	 *     bool hasShips(vector<int> topRight, vector<int> bottomLeft);
+	 * };
+	 */
+
+	class Solution {
+	public:
+	    int countShips(Sea sea, vector<int> topRight, vector<int> bottomLeft) {
+		int result = 0;
+		if (topRight[0] >= bottomLeft[0] &&
+		    topRight[1] >= bottomLeft[1] &&
+		    sea.hasShips(topRight, bottomLeft)) {
+		    if (topRight == bottomLeft) {
+			return 1;
+		    }
+		    const auto& mid_x = (topRight[0] + bottomLeft[0]) / 2;
+		    const auto& mid_y = (topRight[1] + bottomLeft[1]) / 2;
+		    result += countShips(sea, topRight, {mid_x + 1, mid_y + 1});
+		    result += countShips(sea, {mid_x, topRight[1]}, {bottomLeft[0], mid_y + 1});
+		    result += countShips(sea, {topRight[0], mid_y}, {mid_x + 1, bottomLeft[1]});
+		    result += countShips(sea, {mid_x, mid_y}, bottomLeft);
+		}
+		return result;
+	    }
+	};
 ## User Purchase Platform
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT t1.spend_date, 
+	       'both'                       AS platform, 
+	       Sum(Ifnull(t.sum_amount, 0)) AS total_amount, 
+	       Count(t.user_id)             AS total_users 
+	FROM   (SELECT spend_date, 
+		       user_id, 
+		       Sum(amount) AS sum_amount 
+		FROM   spending 
+		GROUP  BY spend_date, 
+			  user_id 
+		HAVING Count(platform) = 2) AS t 
+	       RIGHT JOIN (SELECT DISTINCT spend_date 
+			   FROM   spending) AS t1
+		       ON t.spend_date = t1.spend_date 
+	GROUP  BY t1.spend_date 
+	UNION 
+	SELECT t2.spend_date, 
+	       'mobile'                 AS platform, 
+	       Sum(Ifnull(t.amount, 0)) AS total_amount, 
+	       Count(t.user_id)         AS total_users 
+	FROM   (SELECT spend_date, 
+		       user_id, 
+		       platform, 
+		       amount 
+		FROM   spending 
+		GROUP  BY spend_date, 
+			  user_id 
+		HAVING Count(platform) < 2) AS t 
+	       RIGHT JOIN (SELECT DISTINCT spend_date 
+			   FROM   spending) AS t2 
+		       ON t.spend_date = t2.spend_date 
+			  AND t.platform = 'mobile' 
+	GROUP  BY t2.spend_date 
+	UNION 
+	SELECT t3.spend_date, 
+	       'desktop'                AS platform, 
+	       Sum(Ifnull(t.amount, 0)) AS total_amount, 
+	       Count(t.user_id)         AS total_users 
+	FROM   (SELECT spend_date, 
+		       user_id, 
+		       platform, 
+		       amount 
+		FROM   spending 
+		GROUP  BY spend_date, 
+			  user_id 
+		HAVING Count(platform) < 2) AS t 
+	       RIGHT JOIN (SELECT DISTINCT spend_date 
+			   FROM   spending) AS t3
+		       ON t.spend_date = t3.spend_date 
+			  AND t.platform = 'desktop' 
+	GROUP  BY t3.spend_date
 ## Active Businesses
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT business_id
+	FROM EVENTS
+	JOIN
+	  (SELECT event_type,
+		  avg(occurences) AS average
+	   FROM EVENTS
+	   GROUP BY event_type) AS TEMP ON Events.event_type = temp.event_type
+	AND Events.occurences > temp.average
+	GROUP BY business_id
+	HAVING count(DISTINCT Events.event_type) > 1
+	ORDER BY NULL
 ## Reported Posts
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT extra                   AS report_reason, 
+	       Count(DISTINCT post_id) AS report_count 
+	FROM   actions 
+	WHERE  action = 'report' 
+	       AND action_date = '2019-07-04' 
+	GROUP  BY extra
+	ORDER  BY NULL
 ## Highest Grade For Each Student
+	# Time:  O(nlogn)
+	# Space: O(n)
+
+	SELECT student_id, 
+	       Min(course_id) AS course_id, 
+	       grade 
+	FROM   enrollments 
+	WHERE  ( student_id, grade ) IN (SELECT student_id, 
+						Max(grade) 
+					 FROM   enrollments 
+					 GROUP  BY student_id 
+					 ORDER  BY NULL) 
+	GROUP  BY student_id 
+	ORDER  BY student_id
 ## Handshakes That Don't Cross
+	// Time:  O(n)
+	// Space: O(1)
+
+	class Solution {
+	public:
+	    int numberOfWays(int num_people) {
+		static const int MOD = 1e9 + 7;
+		int n = num_people / 2;
+		return 1ULL * nCr(2 * n, n, MOD) * inv(n + 1, MOD) % MOD;  // Catalan number
+	    }
+
+	private:
+	    int nCr(int n, int k, int m) {
+		if (n - k < k) {
+		    return nCr(n, n - k, m);
+		}
+		uint64_t result = 1;
+		for (int i = 1; i <= k; ++i) {
+		    result = (result * (n - k + i) % m) * inv(i, m) % m;
+		}
+		return result;
+	    }
+
+	    int inv(int x, int m) {  // Euler's Theorem
+		return pow(x, m - 2, m);
+	    }
+
+	    int pow(uint64_t a, int b, int m) {  // O(logMOD) = O(1)
+		a %= m;
+		uint64_t result = 1;
+		while (b) {
+		    if (b & 1) {
+			result = (result * a) % m;
+		    }
+		    a = (a * a) % m;
+		    b >>= 1;
+		}
+		return result;
+	    }
+	};
+
+	// Time:  O(n^2)
+	// Space: O(n)
+	class Solution2 {
+	public:
+	    int numberOfWays(int num_people) {
+		static const int MOD = 1e9 + 7;
+		vector<uint64_t> dp(num_people / 2 + 1);
+		dp[0] = 1ULL;
+		for (int k = 1; k <= num_people / 2; ++k) {
+		    for (int i = 0; i < k; ++i) {
+			dp[k] = (dp[k] + dp[i] * dp[k - 1 - i]) % MOD;
+		    }
+		}
+		return dp[num_people / 2];
+	    }
+	};
 ## New Users Daily Count
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT login_date, 
+	       Count(user_id) AS user_count 
+	FROM   (SELECT user_id, 
+		       Min(activity_date) AS login_date 
+		FROM   traffic 
+		WHERE  activity = 'login' 
+		GROUP  BY user_id
+		ORDER BY NULL) p 
+	WHERE  Datediff('2019-06-30', login_date) <= 90 
+	GROUP BY login_date
+	ORDER BY NULL
 ## Palindrome Removal
+	// Time:  O(n^3)
+	// Space: O(n^2)
+
+	class Solution {
+	public:
+	    int minimumMoves(vector<int>& arr) {
+		vector<vector<int>> dp(arr.size() + 1, vector<int>(arr.size()));
+		for (int l = 1; l <= arr.size(); ++l) {
+		    for (int i = 0; i + l - 1 < arr.size(); ++i) {
+			int j = i + l - 1;
+			if (l == 1) {
+			    dp[i][j] = 1;
+			} else {
+			    dp[i][j] = 1 + dp[i + 1][j];
+			    if (arr[i] == arr[i + 1]) {
+				dp[i][j] = min(dp[i][j], 1 + dp[i + 2][j]);
+			    }
+			    for (int k = i + 2; k <= j; ++k) {
+				if (arr[i] == arr[k]) {
+				    dp[i][j] = min(dp[i][j], dp[i + 1][k - 1] + dp[k + 1][j]);
+				}
+			    }
+			}
+		    }
+		}
+		return dp[0][arr.size() - 1]; 
+	    }
+	};
 ## Delete Tree Nodes
+	// Time:  O(n)
+	// Space: O(n)
+
+	class Solution {
+	public:
+	    int deleteTreeNodes(int nodes, vector<int>& parent, vector<int>& value) {
+		unordered_map<int, vector<int>> children;
+		for (int i = 1; i < parent.size(); ++i) {
+		    children[parent[i]].emplace_back(i);
+		}
+		return dfs(value, &children, 0).second;
+	    }
+
+	private:
+	    pair<int, int> dfs(const vector<int>& value, 
+			       unordered_map<int, vector<int>> *children,
+			       int x) {
+		int total = value[x], count = 1;
+		for (const auto& y : (*children)[x]) {
+		    const auto& [t, c] = dfs(value, children, y);
+		    total += t;
+		    count += t ? c : 0;
+		}
+		return {total, total ? count : 0};
+	    }
+	};
+
+
+	// Time:  O(n)
+	// Space: O(n)
+	class Solution2 {
+	public:
+	    int deleteTreeNodes(int nodes, vector<int>& parent, vector<int>& value) {
+		// assuming parent[i] < i for all i > 0
+		vector<int> result(nodes, 1);
+		for (int i = nodes - 1; i >= 1; --i) {
+		    value[parent[i]] += value[i];
+		    result[parent[i]] += value[i] ? result[i] : 0;
+		}
+		return result[0];
+	    }
+	};
 ## Remove Interval
+	// Time:  O(n)
+	// Space: O(1)
+
+	class Solution {
+	public:
+	    vector<vector<int>> removeInterval(vector<vector<int>>& intervals, vector<int>& toBeRemoved) {
+		vector<vector<int>> result;
+		for (const auto& interval : intervals) {
+		    vector<pair<int, int>> tmp = {{interval[0], min(toBeRemoved[0], interval[1])},
+						  {max(interval[0], toBeRemoved[1]), interval[1]}};
+		    for (const auto& [x, y] : tmp) {
+			if (x < y) {
+			    result.push_back({x, y});
+			}
+		    }
+		}
+		return result;
+	    }
+	};
 ## Hexspeak
+// Time:  O(n)
+// Space: O(1)
+
+class Solution {
+public:
+    string toHexspeak(string num) {
+        unordered_map<int, char> lookup = {{0, 'O'}, {1,'I'}};
+        for (int i = 0; i < 6; ++i) {
+            lookup[10 + i] = 'A' + i;
+        }
+        string result;
+        uint64_t n = stoul(num), r = 0;
+        while (n) {
+            r = n % 16;
+            n /= 16;
+            if (!lookup.count(r)) {
+                return "ERROR";
+            }
+            result.push_back(lookup[r]);
+        }
+        reverse(result.begin(), result.end());
+        return result;
+    }
+};
+
+// Time:  O(n)
+// Space: O(n)
+class Solution2 {
+public:
+    string toHexspeak(string num) {
+        stringstream ss;
+        ss << hex << uppercase  << stoul(num);
+        string result(ss.str());
+        for (auto i = 0; i < result.length(); ++i) {
+            if ('2' <= result[i] && result[i] <= '9') {
+                return "ERROR";
+            }
+            if (result[i] == '0') {
+                result[i] = 'O';
+            }
+            if (result[i] == '1') {
+                result[i] = 'I';
+            }
+        }
+        return result;
+    }
+};
 ## Unpopular Books
+	# Time:  O(m + n)
+	# Space: O(n)
+
+	SELECT b.book_id, 
+	       b.NAME 
+	FROM   books AS b 
+	       LEFT JOIN orders AS o 
+		      ON b.book_id = o.book_id 
+			 AND dispatch_date BETWEEN '2018-06-23' AND '2019-6-23' 
+	WHERE  Datediff('2019-06-23', b.available_from) > 30 
+	GROUP BY book_id 
+	HAVING Sum(IFNULL(o.quantity, 0)) < 10 ORDER  BY NULL 
 ## Game Play Analysis V
+	# Time:  O(n^2)
+	# Space: O(n)
+
+	SELECT install_dt, 
+	       Count(player_id)                             AS installs, 
+	       Round(Count(next_day) / Count(player_id), 2) AS Day1_retention 
+	FROM   (SELECT a.player_id, 
+		       a.install_dt, 
+		       b.event_date AS next_day 
+		FROM   (SELECT player_id, 
+			       Min(event_date) AS install_dt 
+			FROM   activity 
+			GROUP  BY player_id) AS a 
+		       LEFT JOIN activity AS b 
+			      ON Datediff(b.event_date, a.install_dt) = 1
+				 AND a.player_id = b.player_id ) AS t 
+	GROUP  BY install_dt; 
 ## Divide Chocolate
+	// Time:  O(nlogn)
+	// Space: O(1)
+
+	class Solution {
+	public:
+	    int maximizeSweetness(vector<int>& sweetness, int K) {
+		int left = *min_element(sweetness.cbegin(), sweetness.cend());
+		int right = accumulate(sweetness.cbegin(), sweetness.cend(), 0) / (K + 1);
+		while (left <= right) {
+		    const auto& mid = left + (right - left) / 2;
+		    if (!check(sweetness, K, mid)) {
+			right = mid - 1;
+		    } else {
+			left = mid + 1;
+		    }
+		}
+		return right;
+	    }
+
+	private:
+	    bool check(const vector<int>& sweetness, int K, int x) {
+		int curr = 0, cuts = 0;
+		for (const auto& s : sweetness) {
+		    curr += s;
+		    if (curr >= x) {
+			++cuts;
+			curr = 0;
+		    }
+		}
+		return cuts >= K + 1;
+	    }
+	};
 ## Synonymous Sentences
+// Time:  O(p*l * log(p*l)), p is the production of all number of synonyms
+//                         , l is the length of a word
+// Space: O(p*l)
+
+class Solution {
+public:
+    vector<string> generateSentences(vector<vector<string>>& synonyms, string text) {
+        unordered_map<string, int> lookup;
+        unordered_map<int, string> inv_lookup;
+        for (const auto& synonym : synonyms) {
+            assign_id(synonym[0], &lookup, &inv_lookup);
+            assign_id(synonym[1], &lookup, &inv_lookup);
+        }
+        UnionFind union_find(lookup.size());
+        for (const auto& synonym : synonyms) {
+            union_find.union_set(lookup[synonym[0]], lookup[synonym[1]]);
+        }
+        unordered_map<int, vector<int>> groups;
+        for (int i = 0; i < union_find.set().size(); ++i) {
+            groups[union_find.find_set(i)].emplace_back(i);
+        }
+        vector<vector<string>> result;
+        for (const auto& w : split(text, ' ')) {
+            if (!lookup.count(w)) {
+                result.push_back({w});
+                continue;
+            }
+            result.emplace_back();
+            for (const auto& x : groups[union_find.find_set(lookup[w])]) {
+                result.back().emplace_back(inv_lookup[x]);
+            }
+            sort(result.back().begin(), result.back().end());
+        }
+        return product(result);
+    }
+
+private:
+    void assign_id(const string& x,
+                   unordered_map<string, int> *lookup,
+                   unordered_map<int, string> *inv_lookup) {
+        if (lookup->count(x)) {
+            return;
+        }
+        (*lookup)[x] = lookup->size();
+        (*inv_lookup)[(*lookup)[x]] = x;
+    }
+    
+    vector<string> split(const string& s, const char delim) const {
+        vector<string> tokens;
+        stringstream ss(s);
+        string token;
+        while (getline(ss, token, delim)) {
+            if (!token.empty()) {
+                tokens.emplace_back(token);
+            }
+        }
+        return tokens;
+    }
+    
+    vector<string> product(const vector<vector<string>>& options) const {
+        vector<string> result;
+        int total = 1;
+        for (const auto& opt : options) {
+            total *= opt.size();
+        }
+        for (int i = 0; i < total; ++i) {
+            vector<string> tmp;
+            int curr = i;
+            for (int j = options.size() - 1; j >= 0; --j) {
+                tmp.emplace_back(options[j][curr % options[j].size()]);
+                curr /= options[j].size();
+            }
+            reverse(tmp.begin(), tmp.end());
+            result.emplace_back(join(tmp, " "));
+        }
+        return result;
+    }
+    
+    string join(const vector<string>& strings, const string& delim) const {
+        if (strings.empty()) {
+            return "";
+        }
+        ostringstream imploded;
+        copy(strings.begin(), prev(strings.end()), ostream_iterator<string>(imploded, delim.c_str()));
+        return imploded.str() + *prev(strings.end());
+    }
+    
+    class UnionFind {
+        public:
+            UnionFind(const int n) : set_(n) {
+                iota(set_.begin(), set_.end(), 0);
+            }
+
+            int find_set(const int x) {
+               if (set_[x] != x) {
+                   set_[x] = find_set(set_[x]);  // Path compression.
+               }
+               return set_[x];
+            }
+
+            bool union_set(const int x, const int y) {
+                int x_root = find_set(x), y_root = find_set(y);
+                if (x_root == y_root) {
+                    return false;
+                }
+                set_[min(x_root, y_root)] = max(x_root, y_root);
+                return true;
+            }
+        
+            vector<int> set() const {
+                return set_;
+            }
+
+        private:
+            vector<int> set_;
+    };
+};
 ## Smallest Common Region
+  
+	// Time:  O(m * n)
+	// Space: O(n)
+
+	class Solution {
+	public:
+	    string findSmallestRegion(vector<vector<string>>& regions, string region1, string region2) {
+		unordered_map<string, string> parents;
+		for (const auto& region : regions) {
+		    for (int i = 1; i < region.size(); ++i) {
+			parents[region[i]] = region[0];
+		    }
+		}
+		unordered_set<string> lookup = {region1};
+		while (parents.count(region1)) {
+		    region1 = parents[region1];
+		    lookup.emplace(region1);
+		}
+		while (!lookup.count(region2)) {
+		    region2 = parents[region2];
+		}
+		return region2;
+	    }
+	};
+
+
 ## Encode Number
+// Time:  O(logn)
+// Space: O(1)
+
+class Solution {
+public:
+    string encode(int num) {
+        string result;
+        while (num) {
+            result.push_back((num % 2) ? '0' : '1');
+            num = (num - 1) / 2;
+        }
+        reverse(result.begin(), result.end());
+        return result;
+    }
+};
 ## Game Play Analysis IV
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT Round(Count(NULLIF(a.event_date, NULL)) / Count(*), 2) fraction 
+	FROM   activity a 
+	       RIGHT JOIN (SELECT player_id, 
+				  Min(event_date) event_date 
+			   FROM   activity 
+			   GROUP  BY player_id 
+			   ORDER  BY NULL) b 
+		       ON Datediff(a.event_date, b.event_date) = 1 
+			  AND a.player_id = b.player_id
 ## Game Play Analysis III
+	# Time:  O(nlogn)
+	# Space: O(n)
+
+	SELECT player_id, 
+	       event_date, 
+	       @accum := games_played + ( @prev = ( @prev := player_id ) ) * @accum 
+	       games_played_so_far 
+	FROM   activity, 
+	       (SELECT @accum := 0, 
+		       @prev := -1) init 
+	ORDER  BY player_id, 
+		  event_date 
 ## Game Play Analysis II
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT player_id, 
+	       device_id 
+	FROM   activity 
+	WHERE  ( player_id, event_date ) IN (SELECT player_id, 
+						    Min(event_date) 
+					     FROM   activity 
+					     GROUP  BY player_id 
+					     ORDER  BY NULL) 
 ## Game Play Analysis I
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT player_id, 
+	       Min(event_date) first_login 
+	FROM   activity 
+	GROUP  BY player_id 
+	ORDER  BY NULL
 ## Valid Palindrome III
+// Time:  O(n^2)
+// Space: O(n)
+
+class Solution {
+public:
+    bool isValidPalindrome(string s, int k) {
+        if (s == string(s.rbegin(), s.rend())) {  // optional, to optimize special case
+            return true;
+        }
+        
+        vector<vector<int>> dp(2, vector<int>(s.size(), 1));
+        for (int i = s.length() - 2; i >= 0; --i) {
+            for (int j = i + 1; j < s.length(); ++j) {
+                if (s[i] == s[j]) {
+                    dp[i % 2][j] = (i + 1 <= j - 1) ? 2 + dp[(i + 1) % 2][j - 1] : 2;
+                } else {
+                    dp[i % 2][j] = max(dp[(i + 1) % 2][j], dp[i % 2][j - 1]);
+                }
+            }
+        }
+        return s.length() <= k +dp[0][s.length() - 1];
+    }
+};
 ## Tree Diameter
+	// Time:  O(|V| + |E|)
+	// Space: O(|E|)
+
+	class Solution {
+	private:
+		template <typename T>
+	    struct PairHash {
+		size_t operator()(const pair<T, T>& p) const {
+		    size_t seed = 0;
+		    seed ^= std::hash<T>{}(p.first)  + 0x9e3779b9 + (seed<<6) + (seed>>2);
+		    seed ^= std::hash<T>{}(p.second) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+		    return seed;
+		}
+	    };
+
+	public:
+	    int treeDiameter(vector<vector<int>>& edges) {
+		unordered_map<int, unordered_set<int>> graph;
+		int length = 0;
+		for (const auto& edge : edges) {
+		    graph[edge[0]].emplace(edge[1]);
+		    graph[edge[1]].emplace(edge[0]);
+		}
+		unordered_set<pair<int, int>, PairHash<int>> curr_level;
+		for (const auto& [u, neighbors] : graph) {
+		    if (neighbors.size() == 1) {
+			curr_level.emplace(-1, u);
+		    }
+		}
+		while (!curr_level.empty()) {
+		    unordered_set<pair<int, int>, PairHash<int>> new_level;
+		    for (const auto& [prev, u] : curr_level) {
+			for (const auto& v : graph[u]) {
+			    if (v != prev) {
+				new_level.emplace(u, v);
+			    }
+			}
+		    }
+		    curr_level = move(new_level);
+		    ++length;
+		}
+		return max(length - 1, 0);
+	    }
+	};
 ## Design A Leaderboard
+	// Time:  ctor:  O(1)
+	//        add:   O(1)
+	//        top:   O(n)
+	//        reset: O(1)
+	// Space: O(n)
+
+	class Leaderboard {
+	public:
+	    Leaderboard() {
+
+	    }
+
+	    void addScore(int playerId, int score) {
+		lookup_[playerId] += score;
+	    }
+
+	    int top(int K) {
+		vector<int> scores;
+		for (const auto& [k, v] : lookup_) {
+		    scores.emplace_back(v);
+		}
+		nth_element(scores.begin(), scores.begin() + K, scores.end(), greater<int>());
+		return accumulate(scores.cbegin(), scores.cbegin() + K, 0);
+	    }
+
+	    void reset(int playerId) {
+		lookup_[playerId] = 0;
+	    }
+
+	private:
+	    unordered_map<int, int> lookup_;
+	};
 ## Array Transformation
+  
+	// Time:  O(n^2)
+	// Space: O(n)
+
+	class Solution {
+	public:
+	    vector<int> transformArray(vector<int>& arr) {    
+		while (is_changable(arr)) {
+		    auto new_arr = arr;
+		    for (int i = 1; i + 1 < arr.size(); ++i) {
+			new_arr[i] += int(arr[i - 1] > arr[i] && arr[i] < arr[i + 1]);
+			new_arr[i] -= int(arr[i - 1] < arr[i] && arr[i] > arr[i + 1]);
+		    }
+		    arr = move(new_arr);
+		}
+		return arr;
+	    }
+
+	private:
+	    bool is_changable(const vector<int>& arr) {
+		for (int i = 1; i + 1 < arr.size(); ++i) {
+		    if ((arr[i - 1] > arr[i] && arr[i] < arr[i + 1]) ||
+			(arr[i - 1] < arr[i] && arr[i] > arr[i + 1])) {
+			return true;
+		    }
+		}
+		return false;
+	    }
+	};
 ## Sales Analysis III
+	# Time:  O(m + n)
+	# Space: O(m + n)
+
+	SELECT product_id, 
+	       product_name 
+	FROM   product 
+	WHERE  product_id NOT IN (SELECT product_id 
+				  FROM   sales 
+				  WHERE  sale_date NOT BETWEEN 
+					 '2019-01-01' AND '2019-03-31'); 
 ## Sales Analysis II
+	# Time:  O(m + n)
+	# Space: O(m + n)
+
+	SELECT DISTINCT buyer_id 
+	FROM   sales 
+	       INNER JOIN product 
+		 ON sales.product_id = product.product_id 
+	WHERE  product.product_name = "s8" 
+	       AND buyer_id NOT IN (SELECT DISTINCT buyer_id 
+				    FROM   sales 
+					   INNER JOIN product 
+					     ON sales.product_id = product.product_id 
+				    WHERE  product.product_name = "iphone");
 ## Sales Analysis I
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT seller_id 
+	FROM   sales 
+	GROUP  BY seller_id 
+	HAVING Sum(price) = (SELECT Sum(price) 
+			     FROM   sales 
+			     GROUP  BY seller_id 
+			     ORDER  BY Sum(price) DESC 
+			     LIMIT  1) 
+	ORDER  BY NULL
 ## Minimum Time to Build Blocks
+	// Time:  O(nlogn)
+	// Space: O(n)
+
+	class Solution {
+	public:
+	    int minBuildTime(vector<int>& blocks, int split) {
+		priority_queue<int, vector<int>, greater<int>> min_heap(blocks.cbegin(), blocks.cend());
+		while (min_heap.size() != 1) {
+		    min_heap.pop();
+		    const auto y = min_heap.top(); min_heap.pop();
+		    min_heap.emplace(y + split);
+		}
+		return min_heap.top();
+	    }
+	};
 ## Toss Strange Coins
+	// Time:  O(n^2)
+	// Space: O(n)
+
+	class Solution {
+	public:
+	    double probabilityOfHeads(vector<double>& prob, int target) {
+		vector<double> dp(target + 1);
+		dp[0] = 1.0;
+		for (const auto& p : prob) {
+		    for (int i = target; i >= 0; --i) {
+			dp[i] = ((i >= 1) ? dp[i - 1] : 0.0) * p + dp[i] * (1 - p);
+		    }
+		}
+		return dp[target];
+	    }
+	};
 ## Meeting Scheduler
+	// Time:  O(n) ~ O(nlogn)
+	// Space: O(n)
+
+	class Solution {
+	public:
+	    vector<int> minAvailableDuration(vector<vector<int>>& slots1, vector<vector<int>>& slots2, int duration) {
+		vector<pair<int, int>> min_heap;
+		for (const auto& slot : slots1) {
+		    if (slot[1] - slot[0] >= duration) {
+			min_heap.emplace_back(slot[0], slot[1]);
+		    }
+		}
+		for (const auto& slot : slots2) {
+		    if (slot[1] - slot[0] >= duration) {
+			min_heap.emplace_back(slot[0], slot[1]);
+		    }
+		}
+		make_heap(min_heap.begin(), min_heap.end(), greater<>());  // Time: O(n)
+		while (min_heap.size() > 1) {
+		    pop_heap(min_heap.begin(), min_heap.end(), greater<>());  // Time: O(logn)
+		    const auto left = min_heap.back();
+		    min_heap.pop_back();
+		    pop_heap(min_heap.begin(), min_heap.end(), greater<>());
+		    const auto right = min_heap.back();
+		    min_heap.pop_back();
+		    min_heap.emplace_back(right);
+		    push_heap(min_heap.begin(), min_heap.end(), greater<>());
+		    if (left.second - right.first >= duration) {
+			return {right.first, right.first + duration};
+		    }
+		}
+		return {};
+	    }
+	};
+
+	// Time:  O(nlogn)
+	// Space: O(n)
+	class Solution2 {
+	public:
+	    vector<int> minAvailableDuration(vector<vector<int>>& slots1, vector<vector<int>>& slots2, int duration) {
+		priority_queue<pair<int, int>, vector<pair<int, int>>, greater<pair<int, int>>> min_heap;
+		for (const auto& slot : slots1) {
+		    if (slot[1] - slot[0] >= duration) {
+			min_heap.emplace(slot[0], slot[1]);
+		    }
+		}
+		for (const auto& slot : slots2) {
+		    if (slot[1] - slot[0] >= duration) {
+			min_heap.emplace(slot[0], slot[1]);
+		    }
+		}
+		while (min_heap.size() > 1) {
+		    const auto left = min_heap.top();
+		    min_heap.pop();
+		    const auto right = min_heap.top();
+		    if (left.second - right.first >= duration) {
+			return {right.first, right.first + duration};
+		    }
+		}
+		return {};
+	    }
+	};
+
+	// Time:  O(nlogn)
+	// Space: O(n)
+	class Solution3 {
+	public:
+	    vector<int> minAvailableDuration(vector<vector<int>>& slots1, vector<vector<int>>& slots2, int duration) {
+		sort(slots1.begin(), slots1.end());
+		sort(slots2.begin(), slots2.end());
+		int i = 0, j = 0;
+		while (i < slots1.size() && j < slots2.size()) {
+		    const auto& left = max(slots1[i][0], slots2[j][0]);
+		    const auto& right = min(slots1[i][1], slots2[j][1]);
+		    if (left + duration <= right) {
+			return {left, left + duration};
+		    }
+		    if (slots1[i][1] < slots2[j][1]) {
+			++i;
+		    } else {
+			++j;
+		    }
+		}
+		return {};
+	    }
+	};
 ## Missing Number In Arithmetic Progression
+	// Time:  O(logn)
+	// Space: O(1)
+
+	class Solution {
+	public:
+	    int missingNumber(vector<int>& arr) {
+		const auto& d = (arr.back() - arr[0]) / static_cast<int>(arr.size());
+		int left = 0, right = arr.size() - 1;
+		while (left <= right) {
+		    const auto& mid = left + (right - left) / 2;
+		    if (check(arr, d, mid)) {
+			right = mid - 1;
+		    } else {
+			left = mid + 1;
+		    }
+		}
+		return arr[0] + d * left;
+	    }
+
+	private:
+	    bool check(const vector<int>& arr, int d, int x) {
+		return arr[x] != arr[0] + d * x;
+	    }
+	};
+
+	// Time:  O(logn)
+	// Space: O(1)
+	class Solution2 {
+	public:
+	    int missingNumber(vector<int>& arr) {
+		return (*min_element(arr.cbegin(), arr.cend()) +
+			*max_element(arr.cbegin(), arr.cend())) *
+		       (arr.size() + 1) / 2 -
+		       accumulate(arr.cbegin(), arr.cend(), 0);
+	    }
+	};
 ## Project Employees III
+	# Time:  O((m + n)^2)
+	# Space: O(m + n)
+
+	SELECT project_id, 
+	       p1.employee_id 
+	FROM   project AS p1 
+	       INNER JOIN employee AS e1 
+		       ON p1.employee_id = e1.employee_id 
+	WHERE  ( project_id, experience_years ) IN (SELECT project_id, 
+							   Max(experience_years) 
+						    FROM   project AS p2 
+							   INNER JOIN employee AS e2 
+								   ON p2.employee_id = 
+								      e2.employee_id 
+						    GROUP  BY project_id 
+						    ORDER  BY NULL)
 ## Project Employees II
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT project_id 
+	FROM   project 
+	GROUP  BY project_id 
+	HAVING Count(employee_id) = (SELECT Count(employee_id) 
+				     FROM   project 
+				     GROUP  BY project_id 
+				     ORDER  BY Count(employee_id) DESC 
+				     LIMIT  1) 
+	ORDER  BY NULL 
 ## Project Employees I
+	# Time:  O(m + n) 
+	# Space: O(m + n) 
+
+	SELECT project_id, 
+	       Round(Avg(experience_years), 2) AS average_years 
+	FROM   project AS p 
+	       INNER JOIN employee AS e 
+		       ON p.employee_id = e.employee_id 
+	GROUP  BY project_id 
+	ORDER  BY NULL
 ## Product Sales Analysis III
+	# Time:  O(n) 
+	# Space: O(n) 
+
+	SELECT product_id, 
+	       Min(year) AS first_year, 
+	       quantity, 
+	       price 
+	FROM   sales 
+	GROUP  BY product_id 
+	ORDER  BY NULL 
 ## Product Sales Analysis II
+	# Time:  O(n)
+	# Space: O(n)
+
+	SELECT product_id, 
+	       Sum(quantity) AS total_quantity 
+	FROM   sales 
+	GROUP  BY product_id 
+	ORDER  BY NULL
 ## Product Sales Analysis I
+	# Time:  O(m + n)
+	# Space: O(m + n)
+
+	SELECT p.product_name, 
+	       s.year, 
+	       s.price 
+	FROM   sales AS s 
+	       INNER JOIN product AS p 
+		       ON s.product_id = p.product_id
 ## Lexicographically Smallest Equivalent String
 ## Number of Valid Subarrays
 ## Longest Repeating Substring
